@@ -1,0 +1,13 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - VITE_API_URL=https://worth-rises-api-421243404899.us-central1.run.app
+      - --build-arg
+      - VITE_GOOGLE_MAPS_API_KEY=${_VITE_GOOGLE_MAPS_API_KEY}
+      - -t
+      - us-central1-docker.pkg.dev/worth-rises-assignment/worth-rises/web:latest
+      - .
+images:
+  - us-central1-docker.pkg.dev/worth-rises-assignment/worth-rises/web:latest

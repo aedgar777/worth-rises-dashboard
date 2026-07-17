@@ -1,0 +1,29 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: worth_rises
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/init-jurisdictions-db.sql:/docker-entrypoint-initdb.d/02-init-jurisdictions-db.sql
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+      environment:
+      DATABASE_URL: postgresql+pg8000://postgres:postgres@db:5432/worth_rises
+      JURISDICTIONS_DB_NAME: worth_rises_jurisdictions
+      CORS_ORIGINS: http://localhost:5173
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+    depends_on:
+      - db
+
+volumes:
+  pgdata:

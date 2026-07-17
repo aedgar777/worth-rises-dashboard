@@ -1,0 +1,1 @@
+CREATE DATABASE worth_rises_jurisdictions;
