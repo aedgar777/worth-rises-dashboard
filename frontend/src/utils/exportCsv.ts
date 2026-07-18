@@ -22,11 +22,8 @@ export function downloadResultsCsv(
     "type",
     "jurisdiction",
     "state",
-    "county",
-    "facility",
     "in_state_rate",
     "out_of_state_rate",
-    "address",
   ];
 
   const sorted = [...matched].sort((a, b) => {
@@ -48,11 +45,8 @@ export function downloadResultsCsv(
         row.jurisdiction_type,
         formatJurisdiction(row),
         row.state,
-        row.county ?? "",
-        row.facility_name ?? "",
         row.in_state_rate ?? "",
         row.out_of_state_rate ?? "",
-        row.place_description ?? "",
       ]
         .map(escapeCsv)
         .join(","),

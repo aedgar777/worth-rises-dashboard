@@ -59,9 +59,9 @@ Unmatched and review-only rows are omitted from the web tables and the downloada
 
 ### Download results
 
-Click **Download CSV** in the Tables view. The export includes **matched** jurisdictions only—the same cleaned data shown in the tables—plus matched facility name and geocoded address:
+Click **Download CSV** in the Tables view. The export includes **matched** jurisdictions only—the same cleaned data shown in the tables:
 
-- `type`, `jurisdiction`, `state`, `county`, `facility`, `in_state_rate`, `out_of_state_rate`, `address`
+- `type`, `jurisdiction`, `state`, `in_state_rate`, `out_of_state_rate`
 
 ---
 

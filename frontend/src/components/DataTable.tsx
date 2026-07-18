@@ -198,8 +198,8 @@ export function DataTable({ results, uploadId }: DataTableProps) {
         <div>
           <h3>Matched rates</h3>
           <p className="hint table-header-hint">
-            Download CSV exports the same matched jurisdictions shown in the tables
-            below, with facility and address columns included.
+            Download CSV exports the same matched jurisdictions and rates shown in
+            the tables below.
           </p>
         </div>
         <button
