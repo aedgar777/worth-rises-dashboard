@@ -12,7 +12,7 @@ from app.transform.classifier import (
 class TestClassifierExclude(unittest.TestCase):
     def test_excludes_juvenile_facility(self) -> None:
         result = classify_record(
-            "Jefferson County Youth Detention Center",
+            "Rock County Youth Detention Center",
             "",
             "county",
         )
@@ -32,7 +32,7 @@ class TestClassifierExclude(unittest.TestCase):
 class TestClassifierInclude(unittest.TestCase):
     def test_state_doc_is_include(self) -> None:
         result = classify_record(
-            "AK DOC - ANCHORAGE CORRECTIONAL COMPLEX/EAST (ANCHORAGE JAIL)",
+            "WAUPUN CORRECTIONAL INSTITUTION",
             "",
             "state",
         )
@@ -40,24 +40,24 @@ class TestClassifierInclude(unittest.TestCase):
         self.assertTrue(result.matched_include_signals)
 
     def test_county_jail_is_include(self) -> None:
-        result = classify_record("CHILTON COUNTY JAIL", "County Jail", "county")
+        result = classify_record("TRAVIS COUNTY JAIL", "County Jail", "county")
         self.assertEqual(result.decision, "include")
         self.assertIn("county jail", result.matched_include_signals)
 
     def test_county_sheriff_is_include(self) -> None:
-        result = classify_record("MARION COUNTY SHERIFF'S DEPT", "", "county")
+        result = classify_record("ERIE COUNTY SHERIFF'S OFFICE", "", "county")
         self.assertEqual(result.decision, "include")
 
 
 class TestClassifierReview(unittest.TestCase):
     def test_jail_like_name_on_state_jurisdiction(self) -> None:
-        result = classify_record("DENVER COUNTY JAIL", "", "state")
+        result = classify_record("TRAVIS COUNTY JAIL", "", "state")
         self.assertEqual(result.decision, "review")
         self.assertEqual(result.reason, "Jail-like name on state jurisdiction")
 
     def test_prison_like_name_on_county_jurisdiction(self) -> None:
         result = classify_record(
-            "Arkansas Department of Correction",
+            "Wisconsin Department of Corrections",
             "State Prison",
             "county",
         )
@@ -68,7 +68,7 @@ class TestClassifierReview(unittest.TestCase):
 class TestDescribeFacilityRules(unittest.TestCase):
     def test_describes_exclusion_detail(self) -> None:
         text = describe_facility_rules(
-            "Jefferson County Youth Detention Center",
+            "Rock County Youth Detention Center",
             "",
             "county",
             match_confidence=0.2,
@@ -78,7 +78,7 @@ class TestDescribeFacilityRules(unittest.TestCase):
 
     def test_describes_low_confidence(self) -> None:
         text = describe_facility_rules(
-            "CHILTON COUNTY JAIL",
+            "TRAVIS COUNTY JAIL",
             "",
             "county",
             match_score=0.3,

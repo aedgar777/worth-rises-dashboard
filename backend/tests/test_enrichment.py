@@ -10,12 +10,12 @@ class TestEnrichmentCounty(unittest.TestCase):
     def test_places_county_not_applied_to_state_jurisdiction(self) -> None:
         result = MatchResult(
             jurisdiction_type="state",
-            state="CO",
+            state="TX",
             county=None,
-            facility_name="COLORADO DOC",
+            facility_name="TDCJ - WYNNE UNIT",
             provider="securus",
-            in_state_rate=0.05,
-            out_of_state_rate=0.12,
+            in_state_rate=0.06,
+            out_of_state_rate=0.06,
             match_status="matched",
             match_confidence=0.8,
             notes="State prison / DOC facility",
@@ -24,11 +24,11 @@ class TestEnrichmentCounty(unittest.TestCase):
         places.lookup_many = MagicMock(
             return_value=[
                 PlaceResult(
-                    formatted_address="123 Main St, Denver, CO",
-                    latitude=39.7,
-                    longitude=-104.9,
-                    county="DENVER",
-                    state="CO",
+                    formatted_address="8101 FM 969, Austin, TX 78724",
+                    latitude=30.28,
+                    longitude=-97.62,
+                    county="TRAVIS",
+                    state="TX",
                 )
             ]
         )
@@ -36,17 +36,17 @@ class TestEnrichmentCounty(unittest.TestCase):
         enrich_results_with_places([result], places)
 
         self.assertIsNone(result.county)
-        self.assertEqual(result.latitude, 39.7)
+        self.assertEqual(result.latitude, 30.28)
 
     def test_places_county_applied_to_county_jurisdiction(self) -> None:
         result = MatchResult(
             jurisdiction_type="county",
-            state="CO",
+            state="TX",
             county=None,
-            facility_name="DENVER COUNTY JAIL",
+            facility_name="TRAVIS COUNTY JAIL",
             provider="securus",
-            in_state_rate=0.05,
-            out_of_state_rate=0.12,
+            in_state_rate=0.14,
+            out_of_state_rate=0.14,
             match_status="matched",
             match_confidence=0.8,
             notes="County jail / sheriff facility",
@@ -55,18 +55,18 @@ class TestEnrichmentCounty(unittest.TestCase):
         places.lookup_many = MagicMock(
             return_value=[
                 PlaceResult(
-                    formatted_address="123 Main St, Denver, CO",
-                    latitude=39.7,
-                    longitude=-104.9,
-                    county="DENVER",
-                    state="CO",
+                    formatted_address="500 W 10th St, Austin, TX 78701",
+                    latitude=30.27,
+                    longitude=-97.74,
+                    county="TRAVIS",
+                    state="TX",
                 )
             ]
         )
 
         enrich_results_with_places([result], places)
 
-        self.assertEqual(result.county, "DENVER")
+        self.assertEqual(result.county, "TRAVIS")
 
 
 if __name__ == "__main__":
