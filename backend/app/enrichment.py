@@ -42,11 +42,16 @@ def enrich_results_with_places(
             result.longitude = place.longitude
             result.place_id = place.place_id
             result.place_description = place.formatted_address
-            if place.county and not result.county:
+            # Only county jurisdictions carry a county; never copy Places county onto state rows.
+            if (
+                place.county
+                and not result.county
+                and result.jurisdiction_type == "county"
+            ):
                 result.county = place.county
-            if place.county and result.notes:
+            if place.county and result.notes and result.jurisdiction_type == "county":
                 result.notes = f"{result.notes}; Places county: {place.county}"
-            elif place.county:
+            elif place.county and result.jurisdiction_type == "county":
                 result.notes = f"Places county: {place.county}"
         else:
             _apply_jurisdiction_centroid(result)

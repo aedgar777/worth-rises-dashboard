@@ -137,6 +137,13 @@ def _delete_previous_uploads(db: Session, keep_upload_id: int) -> int:
     return deleted
 
 
+def _county_for_jurisdiction(jurisdiction_type: str, county: str | None) -> str | None:
+    """State jurisdictions never carry a county value in stored or exported data."""
+    if jurisdiction_type != "county":
+        return None
+    return county
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
@@ -229,7 +236,7 @@ async def process_csv(
                 upload_id=upload.id,
                 jurisdiction_type=result.jurisdiction_type,
                 state=result.state,
-                county=result.county,
+                county=_county_for_jurisdiction(result.jurisdiction_type, result.county),
                 facility_name=result.facility_name,
                 provider=result.provider,
                 in_state_rate=result.in_state_rate,
@@ -305,7 +312,7 @@ def get_results(upload_id: int, db: Session = Depends(get_db)) -> list[dict]:
             "id": r.id,
             "jurisdiction_type": r.jurisdiction_type,
             "state": r.state,
-            "county": r.county,
+            "county": _county_for_jurisdiction(r.jurisdiction_type, r.county),
             "facility_name": r.facility_name,
             "provider": r.provider,
             "in_state_rate": r.in_state_rate,
