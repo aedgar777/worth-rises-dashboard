@@ -14,7 +14,7 @@ Open **[https://worthrises.andrewedgar.io](https://worthrises.andrewedgar.io)** 
 
 1. On the **Upload Data** panel, click **Choose File**.
 2. Select the raw provider CSV. You can use the assignment test file included in this repo: **[sample-data/worth-rises-raw-data.csv](sample-data/worth-rises-raw-data.csv)** (download or clone the repo, then choose that file in the upload dialog).
-3. Click **Upload & Generate**. The button shows a progress bar while the file uploads and the backend processes it.
+3. Click **Upload & Generate**. The button shows a progress bar while the file uploads and the backend processes it. Allow 10-15 seconds for this to complete.
 
 You only upload the **raw provider file**. The list of 163 jurisdictions to match against is built into the application (seeded from `backend/data/jurisdictions-to-match.csv` into Cloud SQL on deploy).
 
@@ -67,6 +67,8 @@ Click **Download CSV** in the Tables view. The export includes **all** jurisdict
 
 ---
 
+
+
 ## 2. Methodology
 
 The goal is to produce **one row per target jurisdiction** (state prison system or county jail) with the best available **in-state** and **out-of-state** per-minute rates from messy vendor billing data.
@@ -79,10 +81,14 @@ The goal is to produce **one row per target jurisdiction** (state prison system 
   - `county`: county name (empty for state rows)
 2. **Raw provider CSV** — one or two rows per facility from the telecom vendor, with facility names and `per_min` rates.
 
+
+
 ### Step 1 — Normalize
 
 - Column headers are normalized to a common schema.
 - Worth Rises `per_min` + `in_state` boolean rows are merged: `TRUE` → in-state rate, `FALSE` → out-of-state rate.
+
+
 
 ### Step 2 — Classify each facility
 
@@ -116,6 +122,8 @@ Example: **"Jefferson County Youth Detention Center"** matches `\byouth\b` and i
 - Jail-like names on a **state** jurisdiction (e.g. “Denver County Jail” vs Colorado state prison)
 - Prison/DOC-like names on a **county** jurisdiction
 
+
+
 ### Step 3 — Match jurisdictions to facilities
 
 For each of the 163 jurisdictions:
@@ -134,6 +142,8 @@ For each of the 163 jurisdictions:
   - **review** — matched a facility but confidence is borderline
   - **unmatched** — no candidate above threshold (notes explain why; reference facility and `facility_rules` included in CSV)
 
+
+
 ### Step 4 — Resolve ties
 
 When the top two candidates score within **0.05** of each other:
@@ -142,10 +152,14 @@ When the top two candidates score within **0.05** of each other:
 - If rates **differ** → use **Google Places** to geocode each facility and compare address alignment to the target county/state; the better-aligned facility wins.
 - If rates differ but Places is unavailable → mark **review** with reduced confidence.
 
+
+
 ### Step 5 — Enrich and output
 
 - **Google Places** fills missing counties in raw data, geocodes matched facilities for the map, and supplies formatted addresses in the provider facilities table.
 - One wide-format row per jurisdiction is stored in PostgreSQL and returned to the frontend.
+
+
 
 ### Assumptions and limits
 
@@ -158,7 +172,11 @@ Implementation: `backend/app/transform/classifier.py`, `matcher.py`, `columns.py
 
 ---
 
+
+
 ## 3. Tech stack and infrastructure
+
+
 
 ### Repository layout
 
@@ -176,6 +194,8 @@ Implementation: `backend/app/transform/classifier.py`, `matcher.py`, `columns.py
 | `docker-compose.yml`                      | Local PostgreSQL + API                                       |
 
 
+
+
 ### Tools and why I used them
 
 
@@ -190,6 +210,8 @@ Implementation: `backend/app/transform/classifier.py`, `matcher.py`, `columns.py
 | **PostgreSQL**                | Cloud SQL / Docker                          | Persistent uploads and results across sessions         |
 | **Docker + Cloud Build**      | `backend/Dockerfile`, `frontend/Dockerfile` | Reproducible deploys to Cloud Run                      |
 | **unittest**                  | `backend/tests/`                            | Regression tests for classify/match logic              |
+
+
 
 
 ### Cloud infrastructure (GCP)

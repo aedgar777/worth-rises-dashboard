@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 FIELD_MASK = "places.id,places.formattedAddress,places.location,places.addressComponents"
+DEFAULT_MAX_WORKERS = 12
+
+LookupQuery = tuple[str, str, str | None]
 
 
 @dataclass
@@ -25,7 +30,9 @@ class PlaceResult:
 @dataclass
 class PlacesClient:
     api_key: str
+    max_workers: int = DEFAULT_MAX_WORKERS
     _cache: dict[str, PlaceResult | None] = field(default_factory=dict)
+    _cache_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @property
     def enabled(self) -> bool:
@@ -40,18 +47,32 @@ class PlacesClient:
         if not self.enabled or not facility_name.strip():
             return None
 
-        cache_key = f"{facility_name}|{state}|{county_hint or ''}"
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        cache_key = _cache_key(facility_name, state, county_hint)
+        with self._cache_lock:
+            if cache_key in self._cache:
+                return self._cache[cache_key]
 
         query_parts = [facility_name.strip(), state.strip().upper()]
         if county_hint:
             query_parts.insert(1, f"{county_hint} County")
-        text_query = ", ".join(query_parts)
+        result = self._search(", ".join(query_parts))
 
-        result = self._search(text_query)
-        self._cache[cache_key] = result
-        return result
+        with self._cache_lock:
+            self._cache.setdefault(cache_key, result)
+            return self._cache[cache_key]
+
+    def lookup_many(self, queries: list[LookupQuery]) -> list[PlaceResult | None]:
+        if not queries:
+            return []
+        if not self.enabled:
+            return [None] * len(queries)
+        if len(queries) == 1:
+            name, state, county = queries[0]
+            return [self.lookup(name, state, county)]
+
+        workers = min(self.max_workers, len(queries))
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            return list(executor.map(lambda q: self.lookup(*q), queries))
 
     def jurisdiction_alignment_score(
         self,
@@ -116,6 +137,10 @@ class PlacesClient:
         )
 
 
+def _cache_key(facility_name: str, state: str, county_hint: str | None) -> str:
+    return f"{facility_name.strip()}|{state.strip().upper()}|{county_hint or ''}"
+
+
 def _parse_address_components(components: list[dict]) -> tuple[str | None, str | None]:
     county = None
     state = None
@@ -139,17 +164,28 @@ def fill_missing_counties(raw_df, places: PlacesClient) -> int:
     if not places.enabled:
         return 0
 
-    filled = 0
+    rows_by_key: dict[tuple[str, str], list] = {}
     for idx, row in raw_df.iterrows():
         current = str(row.get("county", "") or "").strip()
         if current:
             continue
         facility = str(row.get("facility_name", "") or "").strip()
-        state = str(row.get("state", "") or "").strip()
+        state = str(row.get("state", "") or "").strip().upper()
         if not facility or not state:
             continue
-        place = places.lookup(facility, state, None)
-        if place and place.county:
+        rows_by_key.setdefault((facility, state), []).append(idx)
+
+    if not rows_by_key:
+        return 0
+
+    keys = list(rows_by_key.keys())
+    place_results = places.lookup_many([(facility, state, None) for facility, state in keys])
+
+    filled = 0
+    for (facility, state), place in zip(keys, place_results):
+        if not place or not place.county:
+            continue
+        for idx in rows_by_key[(facility, state)]:
             raw_df.at[idx, "county"] = place.county
             filled += 1
     return filled

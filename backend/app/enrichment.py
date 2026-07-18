@@ -16,12 +16,22 @@ def enrich_results_with_places(
         _apply_centroid_fallback(results)
         return
 
-    for result in results:
+    pending: list[tuple[int, str, str, str | None]] = []
+    for index, result in enumerate(results):
         if not result.facility_name:
             _apply_jurisdiction_centroid(result)
             continue
+        pending.append((index, result.facility_name, result.state, result.county))
 
-        place = places.lookup(result.facility_name, result.state, result.county)
+    if not pending:
+        return
+
+    place_results = places.lookup_many(
+        [(name, state, county) for _, name, state, county in pending]
+    )
+
+    for (index, _name, _state, _county), place in zip(pending, place_results):
+        result = results[index]
         if place and place.latitude is not None and place.longitude is not None:
             result.latitude = place.latitude
             result.longitude = place.longitude

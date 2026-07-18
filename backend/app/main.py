@@ -84,14 +84,18 @@ def _enrich_facility_addresses(
     if not places.enabled:
         return 0
 
-    enriched = 0
-    for row in rows:
-        if row.facility_address:
-            continue
-        place = places.lookup(row.facility_name, row.state, row.county)
-        if place and place.formatted_address:
-            row.facility_address = place.formatted_address
-            enriched += 1
+    pending = [row for row in rows if not row.facility_address]
+    if pending:
+        place_results = places.lookup_many(
+            [(row.facility_name, row.state, row.county) for row in pending]
+        )
+        enriched = 0
+        for row, place in zip(pending, place_results):
+            if place and place.formatted_address:
+                row.facility_address = place.formatted_address
+                enriched += 1
+    else:
+        enriched = 0
 
     if enriched:
         db.commit()

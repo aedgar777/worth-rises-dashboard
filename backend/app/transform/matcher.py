@@ -317,11 +317,15 @@ def _make_places_tiebreaker(
     county: str | None,
 ):
     def tiebreaker(top_candidates: list[tuple[pd.Series, float, str]]) -> int:
+        place_results = places.lookup_many(
+            [
+                (str(row.get("facility_name", "") or ""), state, county)
+                for row, _score, _reason in top_candidates
+            ]
+        )
         best_idx = 0
         best_alignment = -1.0
-        for idx, (row, _score, _reason) in enumerate(top_candidates):
-            facility = str(row.get("facility_name", "") or "")
-            place = places.lookup(facility, state, county)
+        for idx, place in enumerate(place_results):
             alignment = places.jurisdiction_alignment_score(
                 place, jurisdiction_type, state, county
             )
