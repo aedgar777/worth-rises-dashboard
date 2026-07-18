@@ -45,6 +45,8 @@ STATE_NAMES = {
 
 @dataclass
 class MatchResult:
+    """One output row: a reference jurisdiction paired with the best provider match."""
+
     jurisdiction_type: str
     state: str
     county: str | None
@@ -63,12 +65,14 @@ class MatchResult:
 
 
 def _normalize(text: str | None) -> str:
+    """Uppercase and strip punctuation so county and facility names compare reliably."""
     if text is None or (isinstance(text, float) and pd.isna(text)):
         return ""
     return re.sub(r"[^A-Z0-9 ]", " ", str(text).upper()).strip()
 
 
 def _county_in_name(county: str, facility_name: str) -> bool:
+    """True when the county name (or all of its tokens) appears in the facility name."""
     county_norm = _normalize(county)
     name_norm = _normalize(facility_name)
     if not county_norm:
@@ -87,6 +91,11 @@ def _score_candidate(
     state: str,
     county: str | None,
 ) -> tuple[float, str]:
+    """Score how well one raw provider row fits a target jurisdiction (0.0–1.0).
+
+    Returns zero for wrong state or excluded facilities. Otherwise starts at 0.35 and
+    adjusts for county alignment, DOC naming patterns, and classifier decision.
+    """
     facility_name = str(row.get("facility_name", "") or "")
     row_state = str(row.get("state", "") or "").upper().strip()
     row_county = _normalize(row.get("county"))
@@ -141,6 +150,7 @@ def _summarize_no_candidates(
     state: str,
     county: str | None,
 ) -> str:
+    """Explain why no raw facility cleared the minimum candidate score for this jurisdiction."""
     state_upper = state.upper()
     state_rows = raw_df[
         raw_df["state"].astype(str).str.upper().str.strip() == state_upper
@@ -208,7 +218,7 @@ def _find_reference_facility(
     state: str,
     county: str | None,
 ) -> pd.Series | None:
-    """Best-scoring in-state raw row for context, even when not matchable."""
+    """Return the highest-scoring in-state row for context, even when it cannot match."""
     state_upper = state.upper()
     best_row: pd.Series | None = None
     best_score = -1.0
@@ -225,6 +235,7 @@ def _find_reference_facility(
 
 
 def _facility_name_from_row(row: pd.Series | None) -> str | None:
+    """Extract a non-empty facility name from a raw provider row."""
     if row is None:
         return None
     name = str(row.get("facility_name", "") or "").strip()
@@ -238,6 +249,7 @@ def _facility_rules_from_row(
     county: str | None,
     match_confidence: float,
 ) -> str | None:
+    """Describe exclusion/scoring rules for the reference facility on an unmatched row."""
     if row is None:
         return None
     facility_name = str(row.get("facility_name", "") or "")
@@ -256,6 +268,7 @@ def _facility_rules_from_row(
 
 
 def _provider_from_row(row: pd.Series | None) -> str | None:
+    """Extract the telecom vendor name from a raw provider row."""
     if row is None:
         return None
     provider = str(row.get("provider", "") or "").strip()
@@ -263,6 +276,7 @@ def _provider_from_row(row: pd.Series | None) -> str | None:
 
 
 def _as_rate(value) -> float | None:
+    """Parse a rate column value, returning None for blanks or invalid numbers."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
     try:
@@ -292,6 +306,11 @@ def _pick_best(
     candidates: list[tuple[pd.Series, float, str]],
     tiebreaker: Callable[[list[tuple[pd.Series, float, str]]], int] | None = None,
 ) -> tuple[pd.Series | None, float, str, pd.Series | None]:
+    """Choose the best candidate and derive match confidence and explanatory notes.
+
+    Thresholds: candidates need score >= 0.35 to compete, >= 0.45 to win outright.
+    When the top two scores are within 0.05, Places breaks ties only if their rates differ.
+    """
     if not candidates:
         return None, 0.0, "No candidates", None
     candidates.sort(key=lambda item: item[1], reverse=True)
@@ -316,6 +335,8 @@ def _make_places_tiebreaker(
     state: str,
     county: str | None,
 ):
+    """Build a tie-breaker that geocodes tied facilities and picks the best address fit."""
+
     def tiebreaker(top_candidates: list[tuple[pd.Series, float, str]]) -> int:
         place_results = places.lookup_many(
             [
@@ -342,6 +363,11 @@ def match_jurisdictions(
     raw_df: pd.DataFrame,
     places: PlacesClient | None = None,
 ) -> list[MatchResult]:
+    """Produce one MatchResult per reference jurisdiction in the seed list.
+
+    Pipeline: normalize raw CSV → optionally fill counties via Places → score every
+    in-state facility → pick the best match → label as matched, review, or unmatched.
+    """
     raw_df = raw_df.copy()
     raw_df = normalize_raw_columns(raw_df)
     validate_raw_columns(raw_df)
@@ -404,6 +430,7 @@ def match_jurisdictions(
             )
             continue
 
+        # High confidence → matched; borderline → review for human follow-up.
         status = "matched" if confidence >= 0.55 else "review"
         results.append(
             MatchResult(
@@ -425,4 +452,5 @@ def match_jurisdictions(
 
 
 def results_to_dataframe(results: list[MatchResult]) -> pd.DataFrame:
+    """Convert match results to a flat DataFrame for export or inspection."""
     return pd.DataFrame([r.__dict__ for r in results])

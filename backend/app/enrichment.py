@@ -11,7 +11,12 @@ def enrich_results_with_places(
     results: list[MatchResult],
     places: PlacesClient,
 ) -> None:
-    """Geocode matched facilities and attach place metadata (in-place)."""
+    """Attach map coordinates and formatted addresses to every jurisdiction result.
+
+    Looks up each matched facility name through Google Places in parallel. When Places
+    cannot resolve a facility, falls back to a static state/county centroid so the
+    map still renders.
+    """
     if not places.enabled:
         _apply_centroid_fallback(results)
         return
@@ -48,11 +53,13 @@ def enrich_results_with_places(
 
 
 def _apply_centroid_fallback(results: list[MatchResult]) -> None:
+    """Use built-in centroids for every row when the Places API key is not configured."""
     for result in results:
         _apply_jurisdiction_centroid(result)
 
 
 def _apply_jurisdiction_centroid(result: MatchResult) -> None:
+    """Set lat/lng from a static lookup table keyed by state and county."""
     lat, lng = get_coordinates(result.state, result.county, result.jurisdiction_type)
     result.latitude = lat
     result.longitude = lng

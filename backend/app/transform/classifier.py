@@ -48,6 +48,8 @@ PRISON_INCLUDE_PATTERNS = [
 
 @dataclass
 class Classification:
+    """Outcome of applying keyword rules to one raw facility for a jurisdiction type."""
+
     decision: str  # include | exclude | review
     reason: str
     matched_exclude_rules: list[str] = field(default_factory=list)
@@ -55,10 +57,12 @@ class Classification:
 
 
 def _matched_labels(text: str, rules: list[tuple[str, str]]) -> list[str]:
+    """Return human labels for every regex rule that matches the facility text."""
     return [label for pattern, label in rules if re.search(pattern, text, re.IGNORECASE)]
 
 
 def matched_exclude_rules(facility_name: str, facility_type: str) -> list[str]:
+    """List exclusion rule labels that fired for this facility (empty if none)."""
     combined = f"{facility_name} {facility_type}".strip()
     return _matched_labels(combined, EXCLUDE_RULES)
 
@@ -68,9 +72,16 @@ def classify_record(
     facility_type: str,
     jurisdiction_type: str,
 ) -> Classification:
+    """Label a raw facility as include, exclude, or review for the target jurisdiction.
+
+    Excluded facilities never participate in matching. Included facilities are strong
+    candidates (jail names for counties, DOC/prison names for states). Review means
+    the facility type looks plausible but mismatched for the jurisdiction level.
+    """
     combined = f"{facility_name} {facility_type}".strip()
     exclude_rules = _matched_labels(combined, EXCLUDE_RULES)
 
+    # Hard stop: juvenile, federal, ICE, work release, etc. never map to a jurisdiction.
     if exclude_rules:
         return Classification(
             "exclude",
@@ -87,6 +98,7 @@ def classify_record(
                 matched_include_signals=include_signals,
             )
         jail_signals = _matched_labels(combined, JAIL_INCLUDE_PATTERNS)
+        # A county jail name shouldn't be the primary match for a state DOC row.
         if jail_signals:
             return Classification(
                 "review",
@@ -104,6 +116,7 @@ def classify_record(
                 matched_include_signals=include_signals,
             )
         prison_signals = _matched_labels(combined, PRISON_INCLUDE_PATTERNS)
+        # A state prison name on a county row is suspicious — keep for manual review.
         if prison_signals:
             return Classification(
                 "review",
@@ -124,7 +137,11 @@ def describe_facility_rules(
     score_reason: str | None = None,
     match_confidence: float | None = None,
 ) -> str:
-    """Human-readable detail on why a facility was excluded or not selected."""
+    """Build a CSV-friendly explanation of why a facility was excluded or not chosen.
+
+    Used heavily on unmatched rows so reviewers can see which keyword rules and score
+    thresholds blocked a match without opening the code.
+    """
     classification = classify_record(facility_name, facility_type, jurisdiction_type)
     parts: list[str] = []
 
