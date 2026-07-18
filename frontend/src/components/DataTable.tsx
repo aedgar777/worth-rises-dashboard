@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchFacilities, fetchFacilityStates, fetchResults } from "../api";
+import { fetchFacilities, fetchFacilityStates } from "../api";
 import type { MatchedRate, ProviderFacility } from "../types";
 import { downloadResultsCsv } from "../utils/exportCsv";
 import { formatRate } from "../utils/geo";
@@ -118,16 +118,8 @@ export function DataTable({ results, uploadId }: DataTableProps) {
   const [selectedState, setSelectedState] = useState<string>("");
   const [facilities, setFacilities] = useState<ProviderFacility[]>([]);
   const [facilitiesLoading, setFacilitiesLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-
-  const handleDownloadCsv = async () => {
-    setDownloading(true);
-    try {
-      const rows = await fetchResults(uploadId);
-      downloadResultsCsv(rows);
-    } finally {
-      setDownloading(false);
-    }
+  const handleDownloadCsv = () => {
+    downloadResultsCsv(matched);
   };
 
   useEffect(() => {
@@ -206,17 +198,16 @@ export function DataTable({ results, uploadId }: DataTableProps) {
         <div>
           <h3>Matched rates</h3>
           <p className="hint table-header-hint">
-            Tables show matched jurisdictions only. Download CSV includes every
-            jurisdiction (matched, review, and unmatched).
+            Download CSV exports the same matched jurisdictions shown in the tables
+            below, with facility and address columns included.
           </p>
         </div>
         <button
           type="button"
           className="secondary-button"
-          onClick={() => void handleDownloadCsv()}
-          disabled={downloading}
+          onClick={handleDownloadCsv}
         >
-          {downloading ? "Preparing CSV…" : "Download CSV"}
+          Download CSV
         </button>
       </div>
 

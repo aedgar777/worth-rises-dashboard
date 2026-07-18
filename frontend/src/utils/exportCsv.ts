@@ -1,5 +1,5 @@
 import type { MatchedRate } from "../types";
-import { formatJurisdiction } from "./jurisdiction";
+import { formatJurisdiction, getStateName } from "./jurisdiction";
 
 function escapeCsv(value: string | number | null | undefined): string {
   if (value == null) {
@@ -12,7 +12,12 @@ function escapeCsv(value: string | number | null | undefined): string {
   return text;
 }
 
-export function downloadResultsCsv(results: MatchedRate[], filename = "worth-rises-results.csv") {
+export function downloadResultsCsv(
+  results: MatchedRate[],
+  filename = "worth-rises-matched-rates.csv",
+) {
+  const matched = results.filter((row) => row.match_status === "matched");
+
   const headers = [
     "type",
     "jurisdiction",
@@ -21,19 +26,15 @@ export function downloadResultsCsv(results: MatchedRate[], filename = "worth-ris
     "facility",
     "in_state_rate",
     "out_of_state_rate",
-    "status",
-    "confidence",
-    "place",
-    "facility_rules",
-    "notes",
+    "address",
   ];
 
-  const sorted = [...results].sort((a, b) => {
+  const sorted = [...matched].sort((a, b) => {
     const typeOrder = a.jurisdiction_type.localeCompare(b.jurisdiction_type);
     if (typeOrder !== 0) {
       return typeOrder;
     }
-    const stateOrder = a.state.localeCompare(b.state);
+    const stateOrder = getStateName(a.state).localeCompare(getStateName(b.state));
     if (stateOrder !== 0) {
       return stateOrder;
     }
@@ -51,11 +52,7 @@ export function downloadResultsCsv(results: MatchedRate[], filename = "worth-ris
         row.facility_name ?? "",
         row.in_state_rate ?? "",
         row.out_of_state_rate ?? "",
-        row.match_status,
-        row.match_confidence.toFixed(3),
         row.place_description ?? "",
-        row.facility_rules ?? "",
-        row.notes ?? "",
       ]
         .map(escapeCsv)
         .join(","),

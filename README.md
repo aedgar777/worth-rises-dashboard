@@ -55,15 +55,13 @@ After processing, use the **Map** and **Tables** tabs.
   - **Provider facilities** — every raw facility in that state from your upload (with address from Google Places when available).
   - **{State} counties** — matched county jurisdictions for that state only (empty states show “No county-level data for {State}”).
 
-Unmatched and review-only rows are omitted from the web tables but included in the downloadable CSV.
+Unmatched and review-only rows are omitted from the web tables and the downloadable CSV.
 
 ### Download results
 
-Click **Download CSV** in the Tables view. The export includes **all** jurisdictions (matched, review, and unmatched) with full metadata:
+Click **Download CSV** in the Tables view. The export includes **matched** jurisdictions only—the same cleaned data shown in the tables—plus matched facility name and geocoded address:
 
-- Jurisdiction, rates, status, confidence, matched facility, place description
-- `facility_rules` — detail on why a facility was excluded or not selected (especially for unmatched rows)
-- `notes` — last column
+- `type`, `jurisdiction`, `state`, `county`, `facility`, `in_state_rate`, `out_of_state_rate`, `address`
 
 ---
 
@@ -246,6 +244,6 @@ User browser  →  worthrises.andrewedgar.io
 2. API reads CSV into pandas, loads jurisdictions from Cloud SQL.
 3. Pipeline: normalize → classify → score/match each jurisdiction → Places enrichment → save `matched_rates` and `provider_facilities`.
 4. API returns `upload_id`; frontend fetches `/api/uploads/{id}/results`.
-5. Map and tables render from JSON; **Download CSV** is generated client-side from the full result set.
+5. Map and tables render from JSON; **Download CSV** is generated client-side from matched rows only.
 6. **Demo behavior:** after a successful upload, previous upload rows are deleted from Cloud SQL so only the latest run remains. In a **production** environment, a single database would hold a curated master dataset: each new provider file would be matched against the same criteria, staged for human review, and only then merged into the authoritative rate table. The replace-on-upload pattern here is intentionally ephemeral to keep the demo simple and storage minimal.
 
