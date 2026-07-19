@@ -51,17 +51,19 @@ After processing, use the **Map** and **Tables** tabs.
 **Tables**
 
 - **States** — all **matched** state jurisdictions with in-state and out-of-state rates.
-- **State dropdown** — pick a state to load two side-by-side tables below:
-  - **Provider facilities** — every raw facility in that state from your upload (with address from Google Places when available).
-  - **{State} counties** — matched county jurisdictions for that state only (empty states show “No county-level data for {State}”).
+- **Provider facilities** — every raw facility from your upload, with address and rates (table only; not in CSV downloads).
+- **State dropdown** — pick a state to view matched **{State} counties** (empty states show “No county-level data for {State}”).
 
-Unmatched and review-only rows are omitted from the web tables and the downloadable CSV.
+Unmatched and review-only rows are omitted from the web tables; use **Download unmatched list** to export them with reasons.
 
 ### Download results
 
-Click **Download CSV** in the Tables view. The export includes **matched** jurisdictions only—the same cleaned data shown in the tables:
+The Tables view includes two downloads:
 
-- `type`, `jurisdiction`, `state`, `in_state_rate`, `out_of_state_rate`
+- **Download cleaned list** — matched jurisdictions only (same columns as the state and county tables): `type`, `jurisdiction`, `state`, `in_state_rate`, `out_of_state_rate`
+- **Download unmatched list** — jurisdictions marked **review** or **unmatched**, with status, confidence, reference facility, and a combined reason field (`facility_rules` + `notes`)
+
+Provider facilities with addresses and rates remain visible in the table; they are not included in either CSV.
 
 ---
 
@@ -244,6 +246,6 @@ User browser  →  worthrises.andrewedgar.io
 2. API reads CSV into pandas, loads jurisdictions from Cloud SQL.
 3. Pipeline: normalize → classify → score/match each jurisdiction → Places enrichment → save `matched_rates` and `provider_facilities`.
 4. API returns `upload_id`; frontend fetches `/api/uploads/{id}/results`.
-5. Map and tables render from JSON; **Download CSV** is generated client-side from matched rows only.
+5. Map and tables render from JSON; CSV downloads are generated client-side (cleaned matched list and unmatched/review list).
 6. **Demo behavior:** after a successful upload, previous upload rows are deleted from Cloud SQL so only the latest run remains. In a **production** environment, a single database would hold a curated master dataset: each new provider file would be matched against the same criteria, staged for human review, and only then merged into the authoritative rate table. The replace-on-upload pattern here is intentionally ephemeral to keep the demo simple and storage minimal.
 

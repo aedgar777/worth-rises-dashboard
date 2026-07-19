@@ -47,11 +47,11 @@ export async function fetchFacilityStates(uploadId: number): Promise<string[]> {
 
 export async function fetchFacilities(
   uploadId: number,
-  state: string,
+  state?: string,
 ): Promise<ProviderFacility[]> {
   const { data } = await api.get<ProviderFacility[]>(
     `/api/uploads/${uploadId}/facilities`,
-    { params: { state } },
+    { params: state ? { state } : undefined },
   );
   return data;
 }

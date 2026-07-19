@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchFacilities, fetchFacilityStates } from "../api";
 import type { MatchedRate, ProviderFacility } from "../types";
-import { downloadResultsCsv } from "../utils/exportCsv";
+import { downloadResultsCsv, downloadUnmatchedCsv } from "../utils/exportCsv";
 import { formatRate } from "../utils/geo";
 import { formatJurisdiction, getStateName } from "../utils/jurisdiction";
 
@@ -21,7 +21,13 @@ function sortCountyRows(rows: MatchedRate[]): MatchedRate[] {
 }
 
 function sortFacilities(rows: ProviderFacility[]): ProviderFacility[] {
-  return [...rows].sort((a, b) => a.facility_name.localeCompare(b.facility_name));
+  return [...rows].sort((a, b) => {
+    const stateOrder = getStateName(a.state).localeCompare(getStateName(b.state));
+    if (stateOrder !== 0) {
+      return stateOrder;
+    }
+    return a.facility_name.localeCompare(b.facility_name);
+  });
 }
 
 function JurisdictionTable({
@@ -64,20 +70,21 @@ function JurisdictionTable({
 
 function FacilityTable({
   rows,
-  stateLabel,
+  emptyMessage,
 }: {
   rows: ProviderFacility[];
-  stateLabel: string;
+  emptyMessage: string;
 }) {
   return (
     <div className="table-section">
       <h4>Provider facilities</h4>
       {rows.length === 0 ? (
-        <p className="hint">No provider facilities found for {stateLabel}.</p>
+        <p className="hint">{emptyMessage}</p>
       ) : (
         <table>
           <thead>
             <tr>
+              <th>State</th>
               <th>Facility</th>
               <th>Address</th>
               <th>In-State</th>
@@ -87,6 +94,7 @@ function FacilityTable({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
+                <td>{getStateName(row.state)}</td>
                 <td>{row.facility_name}</td>
                 <td>{row.facility_address ?? "—"}</td>
                 <td>{formatRate(row.in_state_rate)}</td>
@@ -116,11 +124,8 @@ export function DataTable({ results, uploadId }: DataTableProps) {
 
   const [facilityStates, setFacilityStates] = useState<string[]>([]);
   const [selectedState, setSelectedState] = useState<string>("");
-  const [facilities, setFacilities] = useState<ProviderFacility[]>([]);
-  const [facilitiesLoading, setFacilitiesLoading] = useState(false);
-  const handleDownloadCsv = () => {
-    downloadResultsCsv(matched);
-  };
+  const [allFacilities, setAllFacilities] = useState<ProviderFacility[]>([]);
+  const [allFacilitiesLoading, setAllFacilitiesLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,35 +154,30 @@ export function DataTable({ results, uploadId }: DataTableProps) {
   }, [uploadId, matchedStateOptions]);
 
   useEffect(() => {
-    if (!selectedState) {
-      setFacilities([]);
-      return;
-    }
-
     let cancelled = false;
-    setFacilitiesLoading(true);
+    setAllFacilitiesLoading(true);
 
-    fetchFacilities(uploadId, selectedState)
+    fetchFacilities(uploadId)
       .then((rows) => {
         if (!cancelled) {
-          setFacilities(sortFacilities(rows));
+          setAllFacilities(sortFacilities(rows));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setFacilities([]);
+          setAllFacilities([]);
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setFacilitiesLoading(false);
+          setAllFacilitiesLoading(false);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [uploadId, selectedState]);
+  }, [uploadId]);
 
   const countyRows = useMemo(
     () =>
@@ -191,6 +191,9 @@ export function DataTable({ results, uploadId }: DataTableProps) {
   );
 
   const selectedStateLabel = selectedState ? getStateName(selectedState) : "";
+  const pendingCount = results.filter(
+    (row) => row.match_status === "review" || row.match_status === "unmatched",
+  ).length;
 
   return (
     <div className="table-panel">
@@ -198,36 +201,58 @@ export function DataTable({ results, uploadId }: DataTableProps) {
         <div>
           <h3>Matched rates</h3>
           <p className="hint table-header-hint">
-            Download CSV exports the same matched jurisdictions and rates shown in
-            the tables below.
+            Tables show matched jurisdictions and every raw provider facility from
+            your upload. Use the downloads for cleaned matched rows or unmatched
+            and review rows with reasons.
           </p>
         </div>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={handleDownloadCsv}
-        >
-          Download CSV
-        </button>
+        <div className="table-header-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => downloadResultsCsv(results)}
+          >
+            Download cleaned list
+          </button>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => downloadUnmatchedCsv(results)}
+            disabled={pendingCount === 0}
+          >
+            Download unmatched list
+          </button>
+        </div>
       </div>
 
       {matched.length === 0 ? (
         <p className="hint">No matched jurisdictions yet.</p>
       ) : (
-        <>
-          <JurisdictionTable
-            title="States"
-            rows={stateRows}
-            emptyMessage="No matched state jurisdictions yet."
-          />
+        <JurisdictionTable
+          title="States"
+          rows={stateRows}
+          emptyMessage="No matched state jurisdictions yet."
+        />
+      )}
 
+      <FacilityTable
+        rows={allFacilitiesLoading ? [] : allFacilities}
+        emptyMessage={
+          allFacilitiesLoading
+            ? "Loading provider facilities…"
+            : "No provider facilities found for this upload."
+        }
+      />
+
+      {matched.length > 0 && (
+        <>
           <div className="state-filter">
             <label htmlFor="state-select" className="state-filter-label">
               Select a state
             </label>
             <p className="hint state-filter-hint">
-              Use this dropdown to view county rates and raw provider facilities
-              for that state side by side below.
+              Use this dropdown to view matched county jurisdictions for that
+              state.
             </p>
             <select
               id="state-select"
@@ -249,20 +274,11 @@ export function DataTable({ results, uploadId }: DataTableProps) {
           </div>
 
           {selectedState && (
-            <div className="tables-layout state-detail-layout">
-              <FacilityTable
-                rows={facilitiesLoading ? [] : facilities}
-                stateLabel={selectedStateLabel}
-              />
-              <JurisdictionTable
-                title={`${selectedStateLabel} counties`}
-                rows={countyRows}
-                emptyMessage={`No county-level data for ${selectedStateLabel}.`}
-              />
-            </div>
-          )}
-          {selectedState && facilitiesLoading && (
-            <p className="hint">Loading facilities for {selectedStateLabel}…</p>
+            <JurisdictionTable
+              title={`${selectedStateLabel} counties`}
+              rows={countyRows}
+              emptyMessage={`No county-level data for ${selectedStateLabel}.`}
+            />
           )}
         </>
       )}

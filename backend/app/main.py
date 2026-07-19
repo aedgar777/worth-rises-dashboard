@@ -382,21 +382,16 @@ def get_facility_states(upload_id: int, db: Session = Depends(get_db)) -> list[s
 @app.get("/api/uploads/{upload_id}/facilities")
 def get_facilities(
     upload_id: int,
-    state: str,
+    state: str | None = None,
     db: Session = Depends(get_db),
     places: PlacesClient = Depends(get_places_client),
 ) -> list[dict]:
-    state_code = state.upper().strip()[:2]
     started = time.perf_counter()
-    rows = (
-        db.query(ProviderFacility)
-        .filter(
-            ProviderFacility.upload_id == upload_id,
-            ProviderFacility.state == state_code,
-        )
-        .order_by(ProviderFacility.facility_name)
-        .all()
-    )
+    query = db.query(ProviderFacility).filter(ProviderFacility.upload_id == upload_id)
+    if state:
+        state_code = state.upper().strip()[:2]
+        query = query.filter(ProviderFacility.state == state_code)
+    rows = query.order_by(ProviderFacility.state, ProviderFacility.facility_name).all()
     if not rows:
         upload = db.query(Upload).filter(Upload.id == upload_id).first()
         if not upload:
@@ -408,7 +403,7 @@ def get_facilities(
         logger.info(
             "Facility addresses enriched: upload_id=%d state=%s count=%d elapsed=%.2fs",
             upload_id,
-            state_code,
+            state or "ALL",
             enriched,
             time.perf_counter() - started,
         )
