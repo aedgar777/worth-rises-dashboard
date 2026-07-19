@@ -21,28 +21,37 @@ function sortCountyRows(rows: MatchedRate[]): MatchedRate[] {
 }
 
 function sortFacilities(rows: ProviderFacility[]): ProviderFacility[] {
-  return [...rows].sort((a, b) => {
-    const stateOrder = getStateName(a.state).localeCompare(getStateName(b.state));
-    if (stateOrder !== 0) {
-      return stateOrder;
-    }
-    return a.facility_name.localeCompare(b.facility_name);
-  });
+  return [...rows].sort((a, b) => a.facility_name.localeCompare(b.facility_name));
+}
+
+function TableLoader({ label }: { label: string }) {
+  return (
+    <div className="table-loader" role="status" aria-live="polite">
+      <span className="table-loader-spinner" aria-hidden="true" />
+      <span>{label}</span>
+    </div>
+  );
 }
 
 function JurisdictionTable({
   title,
   rows,
   emptyMessage,
+  loading = false,
+  loadingLabel,
 }: {
   title: string;
   rows: MatchedRate[];
   emptyMessage: string;
+  loading?: boolean;
+  loadingLabel?: string;
 }) {
   return (
     <div className="table-section">
       <h4>{title}</h4>
-      {rows.length === 0 ? (
+      {loading ? (
+        <TableLoader label={loadingLabel ?? `Loading ${title.toLowerCase()}…`} />
+      ) : rows.length === 0 ? (
         <p className="hint">{emptyMessage}</p>
       ) : (
         <table>
@@ -70,21 +79,24 @@ function JurisdictionTable({
 
 function FacilityTable({
   rows,
-  emptyMessage,
+  stateLabel,
+  loading = false,
 }: {
   rows: ProviderFacility[];
-  emptyMessage: string;
+  stateLabel: string;
+  loading?: boolean;
 }) {
   return (
     <div className="table-section">
       <h4>Provider facilities</h4>
-      {rows.length === 0 ? (
-        <p className="hint">{emptyMessage}</p>
+      {loading ? (
+        <TableLoader label={`Loading facilities for ${stateLabel}…`} />
+      ) : rows.length === 0 ? (
+        <p className="hint">No provider facilities found for {stateLabel}.</p>
       ) : (
         <table>
           <thead>
             <tr>
-              <th>State</th>
               <th>Facility</th>
               <th>Address</th>
               <th>In-State</th>
@@ -94,7 +106,6 @@ function FacilityTable({
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <td>{getStateName(row.state)}</td>
                 <td>{row.facility_name}</td>
                 <td>{row.facility_address ?? "—"}</td>
                 <td>{formatRate(row.in_state_rate)}</td>
@@ -124,8 +135,8 @@ export function DataTable({ results, uploadId }: DataTableProps) {
 
   const [facilityStates, setFacilityStates] = useState<string[]>([]);
   const [selectedState, setSelectedState] = useState<string>("");
-  const [allFacilities, setAllFacilities] = useState<ProviderFacility[]>([]);
-  const [allFacilitiesLoading, setAllFacilitiesLoading] = useState(false);
+  const [facilities, setFacilities] = useState<ProviderFacility[]>([]);
+  const [facilitiesLoading, setFacilitiesLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,30 +165,37 @@ export function DataTable({ results, uploadId }: DataTableProps) {
   }, [uploadId, matchedStateOptions]);
 
   useEffect(() => {
-    let cancelled = false;
-    setAllFacilitiesLoading(true);
+    if (!selectedState) {
+      setFacilities([]);
+      setFacilitiesLoading(false);
+      return;
+    }
 
-    fetchFacilities(uploadId)
+    let cancelled = false;
+    setFacilitiesLoading(true);
+    setFacilities([]);
+
+    fetchFacilities(uploadId, selectedState)
       .then((rows) => {
         if (!cancelled) {
-          setAllFacilities(sortFacilities(rows));
+          setFacilities(sortFacilities(rows));
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setAllFacilities([]);
+          setFacilities([]);
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setAllFacilitiesLoading(false);
+          setFacilitiesLoading(false);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [uploadId]);
+  }, [uploadId, selectedState]);
 
   const countyRows = useMemo(
     () =>
@@ -194,6 +212,8 @@ export function DataTable({ results, uploadId }: DataTableProps) {
   const pendingCount = results.filter(
     (row) => row.match_status === "review" || row.match_status === "unmatched",
   ).length;
+  const showStateDetail =
+    facilityStates.length > 0 || matched.length > 0;
 
   return (
     <div className="table-panel">
@@ -201,8 +221,8 @@ export function DataTable({ results, uploadId }: DataTableProps) {
         <div>
           <h3>Matched rates</h3>
           <p className="hint table-header-hint">
-            Tables show matched jurisdictions and every raw provider facility from
-            your upload. Use the downloads for cleaned matched rows or unmatched
+            Tables show matched jurisdictions and provider facilities for the
+            selected state. Use the downloads for cleaned matched rows or unmatched
             and review rows with reasons.
           </p>
         </div>
@@ -235,24 +255,15 @@ export function DataTable({ results, uploadId }: DataTableProps) {
         />
       )}
 
-      <FacilityTable
-        rows={allFacilitiesLoading ? [] : allFacilities}
-        emptyMessage={
-          allFacilitiesLoading
-            ? "Loading provider facilities…"
-            : "No provider facilities found for this upload."
-        }
-      />
-
-      {matched.length > 0 && (
+      {showStateDetail && (
         <>
           <div className="state-filter">
             <label htmlFor="state-select" className="state-filter-label">
               Select a state
             </label>
             <p className="hint state-filter-hint">
-              Use this dropdown to view matched county jurisdictions for that
-              state.
+              Use this dropdown to view county rates and raw provider facilities
+              for that state side by side below.
             </p>
             <select
               id="state-select"
@@ -274,11 +285,18 @@ export function DataTable({ results, uploadId }: DataTableProps) {
           </div>
 
           {selectedState && (
-            <JurisdictionTable
-              title={`${selectedStateLabel} counties`}
-              rows={countyRows}
-              emptyMessage={`No county-level data for ${selectedStateLabel}.`}
-            />
+            <div className="tables-layout state-detail-layout">
+              <FacilityTable
+                rows={facilities}
+                stateLabel={selectedStateLabel}
+                loading={facilitiesLoading}
+              />
+              <JurisdictionTable
+                title={`${selectedStateLabel} counties`}
+                rows={countyRows}
+                emptyMessage={`No county-level data for ${selectedStateLabel}.`}
+              />
+            </div>
           )}
         </>
       )}

@@ -394,6 +394,32 @@ button:disabled {
   color: #334155;
 }
 
+.table-loader {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 4.5rem;
+  padding: 0.75rem 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.table-loader-spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #cbd5e1;
+  border-top-color: #334155;
+  border-radius: 50%;
+  animation: table-loader-spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes table-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 960px) {
   .tables-layout {
     grid-template-columns: 1fr;

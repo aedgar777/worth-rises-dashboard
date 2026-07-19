@@ -51,8 +51,9 @@ After processing, use the **Map** and **Tables** tabs.
 **Tables**
 
 - **States** — all **matched** state jurisdictions with in-state and out-of-state rates.
-- **Provider facilities** — every raw facility from your upload, with address and rates (table only; not in CSV downloads).
-- **State dropdown** — pick a state to view matched **{State} counties** (empty states show “No county-level data for {State}”).
+- **State dropdown** — pick a state to load two side-by-side tables below:
+  - **Provider facilities** — every raw facility in that state from your upload (with address from Google Places when available; table only, not in CSV downloads).
+  - **{State} counties** — matched county jurisdictions for that state only (empty states show “No county-level data for {State}”).
 
 Unmatched and review-only rows are omitted from the web tables; use **Download unmatched list** to export them with reasons.
 
